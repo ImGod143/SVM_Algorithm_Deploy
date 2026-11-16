@@ -1,15 +1,14 @@
+import os
 import pickle
 import pandas as pd
-from flask import Flask, render_template_string, request
+from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
 
-# Load the trained SVC model (saved as knnmodel.pkl)
-with open("knnmodel.pkl", "rb") as file:
-    model = pickle.load(file)
-
-# Exact feature names and order from the pickle file
-FEATURE_NAMES = ["Age", "Gender", "Region", "Occupation", "Income"]
+# Load the trained SVM model
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "svm.pkl")
+with open(MODEL_PATH, "rb") as f:
+    model = pickle.load(f)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -17,23 +16,23 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Conversion Predictor | SVC Model</title>
+    <title>SVM Model Predictor</title>
     <style>
         :root {
-            --bg-page: #EEF2FF;
-            --bg-card: #FFFFFF;
-            --primary-indigo: #1E1B4B;
-            --accent-indigo: #4F46E5;
-            --accent-hover: #4338CA;
-            --text-main: #1E293B;
-            --text-muted: #64748B;
-            --border-color: #CBD5E1;
-            --yes-bg: #ECFDF5;
-            --yes-border: #10B981;
-            --yes-text: #065F46;
-            --no-bg: #FFF1F2;
-            --no-border: #F43F5E;
-            --no-text: #9F1239;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --input-bg: #0f172a;
+            --yes-bg: rgba(16, 185, 129, 0.15);
+            --yes-border: #10b981;
+            --yes-text: #34d399;
+            --no-bg: rgba(244, 63, 94, 0.15);
+            --no-border: #f43f5e;
+            --no-text: #fb7185;
         }
 
         * {
@@ -44,143 +43,92 @@ HTML_TEMPLATE = """
         }
 
         body {
-            background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
-            color: var(--text-main);
+            background: var(--bg-gradient);
+            color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 1rem;
+            padding: 20px;
         }
 
         .container {
-            width: 100%;
-            max-width: 640px;
-            background: var(--bg-card);
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
             border-radius: 16px;
-            box-shadow: 0 20px 25px -5px rgba(30, 27, 75, 0.1);
-            overflow: hidden;
-            border: 1px solid #E2E8F0;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 480px;
+            padding: 32px;
         }
 
         .header {
-            background: linear-gradient(135deg, var(--primary-indigo) 0%, #312E81 100%);
-            color: #FFFFFF;
-            padding: 2rem;
-            border-bottom: 4px solid var(--accent-indigo);
+            text-align: center;
+            margin-bottom: 28px;
         }
 
         .header h1 {
             font-size: 1.6rem;
             font-weight: 700;
             letter-spacing: -0.02em;
-            margin-bottom: 0.35rem;
+            margin-bottom: 6px;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .header p {
-            color: #C7D2FE;
-            font-size: 0.92rem;
-        }
-
-        .content {
-            padding: 2rem;
-        }
-
-        .result-box {
-            padding: 1.25rem 1.5rem;
-            border-radius: 10px;
-            margin-bottom: 1.75rem;
-            border-left: 5px solid;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-        }
-
-        .result-yes {
-            background-color: var(--yes-bg);
-            border-color: var(--yes-border);
-            color: var(--yes-text);
-        }
-
-        .result-no {
-            background-color: var(--no-bg);
-            border-color: var(--no-border);
-            color: var(--no-text);
-        }
-
-        .result-title {
-            font-size: 1.15rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-
-        .result-badge {
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 0.35rem 0.8rem;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.8);
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.25rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
 
         .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .form-group.full-width {
-            grid-column: 1 / -1;
+            margin-bottom: 18px;
         }
 
         label {
+            display: block;
             font-size: 0.85rem;
             font-weight: 600;
-            color: var(--primary-indigo);
-            margin-bottom: 0.4rem;
-        }
-
-        .hint {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 400;
-            margin-left: 4px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         input, select {
-            padding: 0.7rem 0.9rem;
-            border: 1.5px solid var(--border-color);
+            width: 100%;
+            padding: 12px 14px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border);
             border-radius: 8px;
+            color: var(--text-primary);
             font-size: 0.95rem;
-            color: var(--text-main);
-            background-color: #F8FAFC;
-            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         input:focus, select:focus {
             outline: none;
-            border-color: var(--accent-indigo);
-            background-color: #FFFFFF;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
         }
 
         button {
             width: 100%;
-            margin-top: 1.75rem;
-            background-color: var(--accent-indigo);
-            color: #FFFFFF;
+            padding: 13px;
+            margin-top: 8px;
+            background-color: var(--accent);
+            color: white;
             border: none;
-            padding: 0.95rem 1.5rem;
+            border-radius: 8px;
             font-size: 1rem;
             font-weight: 600;
-            border-radius: 8px;
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s;
         }
@@ -193,142 +141,130 @@ HTML_TEMPLATE = """
             transform: scale(0.99);
         }
 
-        .footer-note {
-            margin-top: 1.5rem;
+        .result-box {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 10px;
             text-align: center;
-            font-size: 0.78rem;
-            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 1.05rem;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .result-yes {
+            background-color: var(--yes-bg);
+            border: 1px solid var(--yes-border);
+            color: var(--yes-text);
+        }
+
+        .result-no {
+            background-color: var(--no-bg);
+            border: 1px solid var(--no-border);
+            color: var(--no-text);
+        }
+
+        .result-error {
+            background-color: rgba(245, 158, 11, 0.15);
+            border: 1px solid #f59e0b;
+            color: #fbbf24;
+            font-size: 0.9rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="header">
-        <h1>Demographic Outcome Predictor</h1>
-        <p>Enter applicant demographic and income details to classify outcome (Yes / No).</p>
-    </div>
-
-    <div class="content">
-        {% if error %}
-            <div class="result-box result-no">
-                <div class="result-title">Error: {{ error }}</div>
-            </div>
-        {% endif %}
-
-        {% if prediction is not none %}
-            {% if prediction|lower == 'yes' %}
-                <div class="result-box result-yes">
-                    <div>
-                        <div class="result-title">Prediction: YES</div>
-                        <div style="font-size: 0.88rem; margin-top: 4px;">Positive class outcome predicted by SVC model.</div>
-                    </div>
-                    <div class="result-badge">Decision Score: {{ decision_score }}</div>
-                </div>
-            {% else %}
-                <div class="result-box result-no">
-                    <div>
-                        <div class="result-title">Prediction: NO</div>
-                        <div style="font-size: 0.88rem; margin-top: 4px;">Negative class outcome predicted by SVC model.</div>
-                    </div>
-                    <div class="result-badge">Decision Score: {{ decision_score }}</div>
-                </div>
-            {% endif %}
-        {% endif %}
+    <div class="container">
+        <div class="header">
+            <h1>SVM Classification Portal</h1>
+            <p>Enter applicant features to run RBF kernel inference</p>
+        </div>
 
         <form method="POST" action="/">
-            <div class="form-grid">
+            <div class="row">
                 <div class="form-group">
-                    <label for="Age">Age <span class="hint">(years)</span></label>
-                    <input type="number" id="Age" name="Age" min="1" max="120" required
-                           value="{{ form_data.get('Age', '30') }}">
+                    <label for="Age">Age</label>
+                    <input type="number" step="any" id="Age" name="Age" placeholder="e.g., 32" value="{{ form_data.get('Age', '') }}" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="Gender">Gender <span class="hint">(encoded)</span></label>
+                    <label for="Gender">Gender (Encoded)</label>
                     <select id="Gender" name="Gender" required>
-                        <option value="0" {% if form_data.get('Gender', '0') == '0' %}selected{% endif %}>0 (Female / Class 0)</option>
-                        <option value="1" {% if form_data.get('Gender') == '1' %}selected{% endif %}>1 (Male / Class 1)</option>
+                        <option value="0" {% if form_data.get('Gender') == '0' %}selected{% endif %}>0 (Female)</option>
+                        <option value="1" {% if form_data.get('Gender') == '1' %}selected{% endif %}>1 (Male)</option>
                     </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="Region">Region (Encoded)</label>
+                    <input type="number" step="any" id="Region" name="Region" placeholder="e.g., 0, 1, 2" value="{{ form_data.get('Region', '') }}" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="Region">Region <span class="hint">(encoded code)</span></label>
-                    <select id="Region" name="Region" required>
-                        <option value="0" {% if form_data.get('Region', '0') == '0' %}selected{% endif %}>Region 0</option>
-                        <option value="1" {% if form_data.get('Region') == '1' %}selected{% endif %}>Region 1</option>
-                        <option value="2" {% if form_data.get('Region') == '2' %}selected{% endif %}>Region 2</option>
-                        <option value="3" {% if form_data.get('Region') == '3' %}selected{% endif %}>Region 3</option>
-                    </select>
+                    <label for="Occupation">Occupation (Encoded)</label>
+                    <input type="number" step="any" id="Occupation" name="Occupation" placeholder="e.g., 0, 1, 2" value="{{ form_data.get('Occupation', '') }}" required>
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="Occupation">Occupation <span class="hint">(encoded code)</span></label>
-                    <select id="Occupation" name="Occupation" required>
-                        <option value="0" {% if form_data.get('Occupation', '0') == '0' %}selected{% endif %}>Occupation 0</option>
-                        <option value="1" {% if form_data.get('Occupation') == '1' %}selected{% endif %}>Occupation 1</option>
-                        <option value="2" {% if form_data.get('Occupation') == '2' %}selected{% endif %}>Occupation 2</option>
-                        <option value="3" {% if form_data.get('Occupation') == '3' %}selected{% endif %}>Occupation 3</option>
-                    </select>
-                </div>
-
-                <div class="form-group full-width">
-                    <label for="Income">Income <span class="hint">(e.g., 25000 - 100000)</span></label>
-                    <input type="number" step="any" id="Income" name="Income" min="0" required
-                           value="{{ form_data.get('Income', '45000') }}">
-                </div>
+            <div class="form-group">
+                <label for="Income">Income</label>
+                <input type="number" step="any" id="Income" name="Income" placeholder="e.g., 55000" value="{{ form_data.get('Income', '') }}" required>
             </div>
 
             <button type="submit">Predict Outcome</button>
         </form>
 
-        <div class="footer-note">
-            Note: Ensure Gender, Region, and Occupation numeric codes match your training notebook's encoding.
-        </div>
-    </div>
-</div>
+        {% if prediction %}
+            <div class="result-box {% if prediction|lower == 'yes' %}result-yes{% else %}result-no{% endif %}">
+                Model Prediction: {{ prediction|upper }}
+            </div>
+        {% endif %}
 
+        {% if error %}
+            <div class="result-box result-error">
+                Error: {{ error }}
+            </div>
+        {% endif %}
+    </div>
 </body>
 </html>
 """
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     prediction = None
-    decision_score = None
     error = None
     form_data = {}
 
     if request.method == "POST":
+        form_data = request.form.to_dict()
         try:
-            form_data = request.form.to_dict()
-            input_values = [
-                float(request.form["Age"]),
-                float(request.form["Gender"]),
-                float(request.form["Region"]),
-                float(request.form["Occupation"]),
-                float(request.form["Income"]),
-            ]
+            # Build DataFrame with exact column names matching feature_names_in_
+            input_df = pd.DataFrame([{
+                "Age": float(request.form["Age"]),
+                "Gender": float(request.form["Gender"]),
+                "Region": float(request.form["Region"]),
+                "Occupation": float(request.form["Occupation"]),
+                "Income": float(request.form["Income"]),
+            }])
 
-            input_df = pd.DataFrame([input_values], columns=FEATURE_NAMES)
-
-            # Returns 'yes' or 'no'
-            prediction = str(model.predict(input_df)[0])
-            # Distance from the separating hyperplane (since probability=False in SVC)
-            decision_score = round(float(model.decision_function(input_df)[0]), 3)
-
+            pred = model.predict(input_df)[0]
+            prediction = str(pred)
         except Exception as e:
-            error = f"Invalid input or prediction error: {str(e)}"
+            error = str(e)
 
     return render_template_string(
         HTML_TEMPLATE,
         prediction=prediction,
-        decision_score=decision_score,
         error=error,
-        form_data=form_data,
+        form_data=form_data
     )
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
